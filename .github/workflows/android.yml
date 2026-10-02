@@ -7,45 +7,79 @@ on:
       - master
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   build:
-
+    name: Build DEVORA APK
     runs-on: ubuntu-latest
 
     steps:
-
-      - name: Checkout
+      # 1. Soo dejiso repository-ga
+      - name: Checkout repository
         uses: actions/checkout@v4
 
+      # 2. Java 17
       - name: Setup Java 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: "17"
           cache: gradle
 
-      - name: Install Android SDK
+      # 3. Hubi Android SDK
+      - name: Setup Android SDK
         run: |
-          yes | sdkmanager --licenses > /dev/null || true
-          sdkmanager "platform-tools"
-          sdkmanager "platforms;android-35"
-          sdkmanager "build-tools;35.0.0"
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
 
+          yes | sdkmanager --licenses > /dev/null 2>&1 || true
+
+          sdkmanager \
+            "platform-tools" \
+            "platforms;android-35" \
+            "build-tools;35.0.0"
+
+      # 4. Hubi Java iyo Android
+      - name: Check build environment
+        run: |
+          java -version
+          adb --version
+          sdkmanager --version
+
+      # 5. Install Gradle 8.10
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: '8.10'
+          gradle-version: "8.10"
 
+      # 6. Samee Gradle Wrapper haddii uusan repository-ga ku jirin
       - name: Generate Gradle Wrapper
         run: |
-          gradle wrapper --gradle-version 8.10
+          if [ ! -f "./gradlew" ]; then
+            gradle wrapper --gradle-version 8.10
+          fi
 
+      # 7. Sii gradlew permission
       - name: Make Gradle executable
         run: chmod +x ./gradlew
 
-      - name: Build DEVORA APK
-        run: ./gradlew assembleDebug --stacktrace
+      # 8. Nadiifi project-ka
+      - name: Clean project
+        run: ./gradlew clean --stacktrace
 
+      # 9. Build APK
+      - name: Build DEVORA Debug APK
+        run: ./gradlew assembleDebug --stacktrace --no-daemon
+
+      # 10. Hubi APK-ga
+      - name: Check APK
+        run: |
+          echo "APK files:"
+          find app/build/outputs -type f -name "*.apk" -print
+
+      # 11. Upload APK
       - name: Upload DEVORA APK
         uses: actions/upload-artifact@v4
         with:
